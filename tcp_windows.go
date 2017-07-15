@@ -24,51 +24,47 @@ type Conn struct {
 	addr *net.TCPAddr
 }
 
-func Listen(n, addr string) (*Listener, error) {
-	ad, err := net.ResolveTCPAddr(n, addr)
+func Listen(protocol string, address string) (*Listener, error) {
+	tcpAddress, err := net.ResolveTCPAddr(protocol, address)
 	if err != nil {
 		return nil, err
 	}
 
-	s, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_STREAM, 0)
+	socketHandle, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_STREAM, 0)
 	if err != nil {
 		return nil, err
 	}
 
-	var sa syscall.Sockaddr
-	switch n {
+	var socketAddress syscall.Sockaddr
+	switch protocol {
 	case "tcp", "tcp4":
-		sa4 := new(syscall.SockaddrInet4)
-		for i := 0; i < len(ad.IP); i++ {
-			sa4.Addr[i] = ad.IP[i]
-		}
-		sa4.Port = ad.Port
-		sa = sa4
+		socketAddressIpV4 := new(syscall.SockaddrInet4)
+		socketAddressIpV4.Port = tcpAddress.Port
+		copy(socketAddressIpV4.Addr[:], tcpAddress.IP.To4())
+		socketAddress = socketAddressIpV4
 	case "tcp6":
-		sa4 := new(syscall.SockaddrInet6)
-		for i := 0; i < len(ad.IP); i++ {
-			sa4.Addr[i] = ad.IP[i]
-		}
-		sa4.Port = ad.Port
-		sa = sa4
+		socketAddressIpv6 := new(syscall.SockaddrInet6)
+		socketAddressIpv6.Port = tcpAddress.Port
+		copy(socketAddressIpv6.Addr[:], tcpAddress.IP.To16())
+		socketAddress = socketAddressIpv6
 	}
 
-	err = syscall.Bind(s, sa)
+	err = syscall.Bind(socketHandle, socketAddress)
 	if err != nil {
 		return nil, err
 	}
 
-	err = syscall.Listen(s, syscall.SOMAXCONN)
+	err = syscall.Listen(socketHandle, syscall.SOMAXCONN)
 	if err != nil {
 		return nil, err
 	}
 
-	ssa, err := syscall.Getsockname(syscall.Handle(s))
+	ssa, err := syscall.Getsockname(syscall.Handle(socketHandle))
 	if err != nil {
 		return nil, err
 	}
 	ta := &net.IPAddr{IP: ssa.(*syscall.SockaddrInet4).Addr[0:]}
-	return &Listener{uintptr(s), sa, ta}, nil
+	return &Listener{uintptr(socketHandle), socketAddress, ta}, nil
 }
 
 func (l *Listener) Addr() net.Addr {
