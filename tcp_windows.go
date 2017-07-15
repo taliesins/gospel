@@ -67,19 +67,19 @@ func Listen(protocol string, address string) (*Listener, error) {
 	return &Listener{uintptr(socketHandle), socketAddress, ta}, nil
 }
 
-func (l *Listener) Addr() net.Addr {
-	return l.addr
+func (listener *Listener) Addr() net.Addr {
+	return listener.addr
 
 }
 
-func (l *Listener) Close() error {
-	return syscall.Closesocket(syscall.Handle(l.fd))
+func (listener *Listener) Close() error {
+	return syscall.Closesocket(syscall.Handle(listener.fd))
 }
 
-func (l *Listener) Accept() (net.Conn, error) {
-	var sa syscall.SockaddrInet4
-	sl := unsafe.Sizeof(sa)
-	newfd, r1, err := procAccept.Call(uintptr(l.fd), uintptr(unsafe.Pointer(&sa)), uintptr(unsafe.Pointer(&sl)))
+func (listener *Listener) Accept() (net.Conn, error) {
+	var socketAddressIpV4 syscall.SockaddrInet4
+	sizeOfSocketAddressIpV4 := unsafe.Sizeof(socketAddressIpV4)
+	newfd, r1, err := procAccept.Call(uintptr(listener.fd), uintptr(unsafe.Pointer(&socketAddressIpV4)), uintptr(unsafe.Pointer(&sizeOfSocketAddressIpV4)))
 	if err != nil && r1 == 0 {
 		return nil, err
 	}
@@ -88,11 +88,11 @@ func (l *Listener) Accept() (net.Conn, error) {
 }
 
 func (c *Conn) Read(b []byte) (n int, e error) {
-	var buf syscall.WSABuf
-	buf.Buf = &b[0]
-	buf.Len = uint32(len(b))
+	var buffer syscall.WSABuf
+	buffer.Buf = &b[0]
+	buffer.Len = uint32(len(b))
 	var qty, flags uint32
-	err := syscall.WSARecv(syscall.Handle(c.fd), &buf, 1, &qty, &flags, nil, nil)
+	err := syscall.WSARecv(syscall.Handle(c.fd), &buffer, 1, &qty, &flags, nil, nil)
 	return int(qty), err
 }
 

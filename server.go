@@ -21,19 +21,19 @@ func New(cmd *exec.Cmd) *Gospel {
 	return &Gospel{cmd}
 }
 
-func (g *Gospel) Listen(addr string) error {
-	var l net.Listener
+func (g *Gospel) Listen(address string) error {
+	var listener net.Listener
 	var err error
 	if runtime.GOOS == "windows" {
-		l, err = Listen("tcp", addr)
+		listener, err = Listen("tcp", address)
 	} else {
-		l, err = net.Listen("tcp", addr)
+		listener, err = net.Listen("tcp", address)
 	}
 	if err != nil {
 		return err
 	}
 
-	p, err := g.exec(l)
+	process, err := g.exec(listener)
 	if err != nil {
 		return err
 	}
@@ -42,36 +42,36 @@ func (g *Gospel) Listen(addr string) error {
 	for {
 		switch sig := <-c; sig {
 		case syscall.SIGHUP:
-			child, err := g.exec(l)
+			child, err := g.exec(listener)
 			if err != nil {
 				return err
 			}
-			p.Signal(syscall.SIGINT)
-			p.Wait()
-			p = child
+			process.Signal(syscall.SIGINT)
+			process.Wait()
+			process = child
 		case syscall.SIGINT:
 			signal.Stop(c)
-			l.Close()
-			p.Signal(syscall.SIGINT)
-			_, err := p.Wait()
+			listener.Close()
+			process.Signal(syscall.SIGINT)
+			_, err := process.Wait()
 			return err
 		}
 	}
 }
 
-func sysfd(l net.Listener) uintptr {
-	if ll, ok := l.(*Listener); ok {
+func sysfd(listener net.Listener) uintptr {
+	if ll, ok := listener.(*Listener); ok {
 		return ll.fd
 	}
-	return *(*uintptr)(unsafe.Pointer(reflect.ValueOf(l).Elem().FieldByName("fd").Elem().FieldByName("sysfd").Addr().Pointer()))
+	return *(*uintptr)(unsafe.Pointer(reflect.ValueOf(listener).Elem().FieldByName("fd").Elem().FieldByName("sysfd").Addr().Pointer()))
 }
 
 func fd() (uintptr, error) {
-	s := os.Getenv("GOSPEL_FD")
-	if s == "" {
+	socketFileName := os.Getenv("GOSPEL_FD")
+	if socketFileName == "" {
 		return 0, errors.New("server not found")
 	}
-	fd, err := strconv.Atoi(s)
+	fd, err := strconv.Atoi(socketFileName)
 	if err != nil {
 		return 0, err
 	}

@@ -9,8 +9,8 @@ import (
 	"strconv"
 )
 
-func (g *Gospel) exec(l net.Listener) (*os.Process, error) {
-	fd := sysfd(l)
+func (g *Gospel) exec(listener net.Listener) (*os.Process, error) {
+	fd := sysfd(listener)
 
 	g.cmd.Env = []string{fmt.Sprintf("GOSPEL_FD=%d", fd)}
 	g.cmd.ExtraFiles = []*os.File{os.Stdin, os.Stdout, os.Stderr, os.NewFile(uintptr(fd), "sysfile")}

@@ -75,51 +75,51 @@ func WSASocket(af int32, stype int32, protocol int32, pi *syscall.WSAProtocolInf
 	return
 }
 
-func (g *Gospel) exec(l net.Listener) (*os.Process, error) {
-	fd := sysfd(l)
+func (g *Gospel) exec(listener net.Listener) (*os.Process, error) {
+	fd := sysfd(listener)
 
-	f, err := ioutil.TempFile(os.TempDir(), "gospel-fd")
+	socketFile, err := ioutil.TempFile(os.TempDir(), "gospel-fd")
 	if err != nil {
 		return nil, err
 	}
-	os.Setenv("GOSPEL_FD", f.Name())
+	os.Setenv("GOSPEL_FD", socketFile.Name())
 	err = g.cmd.Start()
 	if err != nil {
-		f.Close()
-		os.Remove(f.Name())
+		socketFile.Close()
+		os.Remove(socketFile.Name())
 		return nil, err
 	}
 	b := make([]byte, int(unsafe.Sizeof(syscall.WSAProtocolInfo{})))
 	err = WSADuplicateSocket(syscall.Handle(fd), uint32(g.cmd.Process.Pid), (*syscall.WSAProtocolInfo)(unsafe.Pointer(&b[0])))
 	if err != nil {
-		f.Close()
-		os.Remove(f.Name())
+		socketFile.Close()
+		os.Remove(socketFile.Name())
 		return nil, err
 	}
-	f.Write(b)
-	f.Close()
+	socketFile.Write(b)
+	socketFile.Close()
 	return g.cmd.Process, err
 }
 
 func ListenerFromEnv() (net.Listener, error) {
-	fn := os.Getenv("GOSPEL_FD")
+	socketFileName := os.Getenv("GOSPEL_FD")
 	l := int(unsafe.Sizeof(syscall.WSAProtocolInfo{}))
-	var b []byte
+	var socketFileContents []byte
 	var err error
 	for n := 0; n < 3; n++ {
-		b, err = ioutil.ReadFile(fn)
-		if len(b) == l {
+		socketFileContents, err = ioutil.ReadFile(socketFileName)
+		if len(socketFileContents) == l {
 			break
 		}
 		time.Sleep(1e9)
 	}
-	if len(b) == 0 {
+	if len(socketFileContents) == 0 {
 		return nil, errors.New("server not found")
 	}
 	if err != nil {
 		return nil, err
 	}
-	pi := (*syscall.WSAProtocolInfo)(unsafe.Pointer(&b[0]))
+	pi := (*syscall.WSAProtocolInfo)(unsafe.Pointer(&socketFileContents[0]))
 	fd, err := WSASocket(-1, -1, -1, pi, 0, 0)
 	if err != nil {
 		return nil, err
